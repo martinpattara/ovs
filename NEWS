@@ -29,6 +29,7 @@ Post-v2.13.0
    - Tunnels: TC Flower offload
      * Tunnel Local endpoint address masked match are supported.
      * Tunnel Romte endpoint address masked match are supported.
+   - Encap & Decap action support for MPLS packet type.
 
 
 v2.13.0 - 14 Feb 2020
