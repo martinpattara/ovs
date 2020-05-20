@@ -67,6 +67,7 @@
 #include "unixctl.h"
 #include "util.h"
 
+
 VLOG_DEFINE_THIS_MODULE(ofproto);
 
 COVERAGE_DEFINE(ofproto_flush);
