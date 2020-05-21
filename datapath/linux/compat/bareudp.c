@@ -20,8 +20,9 @@
 #include <net/udp_tunnel.h>
 #include <net/bareudp.h>
 
-#include "compat.h"
+#include "datapath.h"
 #include "vport-netdev.h"
+#include "compat.h"
 
 #ifndef USE_UPSTREAM_TUNNEL
 
