@@ -7890,20 +7890,33 @@ commit_mpls_action(const struct flow *flow, struct flow *base,
      * than base then some LSEs need to be pushed. */
     while (base_n < flow_n) {
         struct ovs_action_add_mpls *mpls;
+        struct ovs_action_push_mpls *pmpls;
 
-        mpls = nl_msg_put_unspec_zero(odp_actions,
+        if (!pending_encap) {
+            pmpls = nl_msg_put_unspec_zero(odp_actions,
+                                      OVS_ACTION_ATTR_PUSH_MPLS,
+                                      sizeof *pmpls);
+            pmpls->mpls_ethertype = flow->dl_type;
+            pmpls->mpls_lse = flow->mpls_lse[flow_n - base_n - 1];
+           
+        } else {
+
+            mpls = nl_msg_put_unspec_zero(odp_actions,
                                       OVS_ACTION_ATTR_ADD_MPLS,
                                       sizeof *mpls);
-        mpls->mpls_ethertype = flow->dl_type;
-        mpls->mpls_lse = flow->mpls_lse[flow_n - base_n - 1];
-        if (!pending_encap) {
-           mpls->tun_flags |= OVS_MPLS_L3_TUNNEL_FLAG_MASK;
+            mpls->mpls_ethertype = flow->dl_type;
+            mpls->mpls_lse = flow->mpls_lse[flow_n - base_n - 1];
         }
         /* Update base flow's MPLS stack, but do not clear L3.  We need the L3
          * headers if the flow is restored later due to returning from a patch
          * port or group bucket. */
-        flow_push_mpls(base, base_n, mpls->mpls_ethertype, NULL, false);
-        flow_set_mpls_lse(base, 0, mpls->mpls_lse);
+        if (!pending_encap) {
+            flow_push_mpls(base, base_n, pmpls->mpls_ethertype, NULL, false);
+            flow_set_mpls_lse(base, 0, pmpls->mpls_lse);
+        } else {
+            flow_push_mpls(base, base_n, mpls->mpls_ethertype, NULL, false);
+            flow_set_mpls_lse(base, 0, mpls->mpls_lse);
+        }
         base_n++;
     }
 }
