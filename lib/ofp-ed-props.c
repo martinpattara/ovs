@@ -159,7 +159,7 @@ encode_ed_prop(const struct ofpact_ed_prop **prop,
        switch ((*prop)->type) {
        case OFPPPT_PROP_MPLS_ETHERTYPE: {
            struct ofpact_ed_prop_mpls_ethertype *pnmt =
-                ALIGNED_CAST(struct ofp_ed_prop_mpls_ethertype *, *prop);
+                ALIGNED_CAST(struct ofpact_ed_prop_mpls_ethertype *, *prop);
             struct ofp_ed_prop_mpls_ethertype *opnmt =
                     ofpbuf_put_uninit(out, sizeof(*opnmt));
             opnmt->header.prop_class = htons((*prop)->prop_class);
