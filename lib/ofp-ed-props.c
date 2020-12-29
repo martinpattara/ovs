@@ -227,6 +227,8 @@ parse_ed_prop_type(uint16_t prop_class,
         if (!strcmp(str, "ether_type")) {
             *type = OFPPPT_PROP_MPLS_ETHERTYPE;
             return true;
+        } else {
+            return false;
         }
     default:
         return false;
