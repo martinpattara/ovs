@@ -6554,6 +6554,9 @@ xlate_generic_encap_action(struct xlate_ctx *ctx,
             break;
         case PT_MPLS:
             rewrite_flow_encap_mpls(ctx, encap,  flow, wc);
+            if (!ctx->xbridge->support.add_mpls) {
+                ctx->xout->slow |= SLOW_ACTION; 
+            }		    
             break;
         default:
             /* New packet type was checked during decoding. */
