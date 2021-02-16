@@ -7940,20 +7940,22 @@ commit_mpls_action(const struct flow *flow, struct flow *base,
      * than base then some LSEs need to be pushed. */
     while (base_n < flow_n) {
 
-        if (!pending_encap) {
-             struct ovs_action_push_mpls *mpls;
-
-             mpls = nl_msg_put_unspec_zero(odp_actions,
-                                           OVS_ACTION_ATTR_PUSH_MPLS,
-                                           sizeof *mpls);
-
-             mpls->mpls_ethertype = flow->dl_type;
-             mpls->mpls_lse = flow->mpls_lse[flow_n - base_n - 1];
-        } else {
+        if (pending_encap || ctx->xbridge->support.add_mpls) {
              struct ovs_action_add_mpls *mpls;
 
              mpls = nl_msg_put_unspec_zero(odp_actions,
                                            OVS_ACTION_ATTR_ADD_MPLS,
+                                           sizeof *mpls);
+             if (!pending_encap) {
+                 mpls->tun_flags |= OVS_MPLS_L3_TUNNEL_FLAG_MASK;
+             }
+             mpls->mpls_ethertype = flow->dl_type;
+             mpls->mpls_lse = flow->mpls_lse[flow_n - base_n - 1];
+        } else {
+             struct ovs_action_push_mpls *mpls;
+
+             mpls = nl_msg_put_unspec_zero(odp_actions,
+                                           OVS_ACTION_ATTR_PUSH_MPLS,
                                            sizeof *mpls);
              mpls->mpls_ethertype = flow->dl_type;
              mpls->mpls_lse = flow->mpls_lse[flow_n - base_n - 1];
