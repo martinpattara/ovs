@@ -3778,7 +3778,8 @@ xlate_commit_actions(struct xlate_ctx *ctx)
     ctx->xout->slow |= commit_odp_actions(&ctx->xin->flow, &ctx->base_flow,
                                           ctx->odp_actions, ctx->wc,
                                           use_masked, ctx->pending_encap,
-                                          ctx->pending_decap, ctx->encap_data);
+                                          ctx->pending_decap, ctx->encap_data,
+                                          ctx->xbridge->support.add_mpls);
     ctx->pending_encap = false;
     ctx->pending_decap = false;
     ofpbuf_delete(ctx->encap_data);
