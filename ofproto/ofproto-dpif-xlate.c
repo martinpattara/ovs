@@ -6637,6 +6637,9 @@ xlate_generic_decap_action(struct xlate_ctx *ctx,
 
              n = flow_count_mpls_labels(flow, ctx->wc);
              flow_pop_mpls(flow, n, ethertype, ctx->wc);
+             if (!ctx->xbridge->support.add_mpls) {
+                ctx->xout->slow |= SLOW_ACTION; 
+             } 
              ctx->pending_decap = true;
              return true;
         }
