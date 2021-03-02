@@ -1026,6 +1026,7 @@ AT_CHECK([ovs-ofctl add-flows br1 flows.txt])
 NS_CHECK_EXEC([at_ns0], [ping -q -c 3 -i 0.3 -w 2 10.1.1.2 | FORMAT_PING], [0], [dnl
 3 packets transmitted, 3 received, 0% packet loss, time 0ms
 ])
+
 OVS_TRAFFIC_VSWITCHD_STOP
 AT_CLEANUP
 
@@ -1064,6 +1065,7 @@ NS_CHECK_EXEC([at_ns0], [ping -q -c 3 -i 0.3 -w 2 10.1.1.2 | FORMAT_PING], [0], 
 NS_CHECK_EXEC([at_ns1], [ping -q -c 3 -i 0.3 -w 2 10.1.1.1 | FORMAT_PING], [0], [dnl
 3 packets transmitted, 3 received, 0% packet loss, time 0ms
 ])
+
 OVS_TRAFFIC_VSWITCHD_STOP
 AT_CLEANUP
 
