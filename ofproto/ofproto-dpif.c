@@ -1551,7 +1551,7 @@ check_add_mpls(struct dpif_backer *backer)
     supported = dpif_probe_feature(backer->dpif, "add_mpls", &key,
                                    &actions, NULL);
     ofpbuf_uninit(&actions);
-    VLOG_WARN("%s: Datapath %s add_mpls action",
+    VLOG_INFO("%s: Datapath %s add_mpls action",
               dpif_name(backer->dpif), supported ? "supports"
                                                  : "does not support");
     return supported;
