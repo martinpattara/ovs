@@ -7887,7 +7887,7 @@ commit_vlan_action(const struct flow* flow, struct flow *base,
 static void
 commit_mpls_action(const struct flow *flow, struct flow *base,
                    struct ofpbuf *odp_actions, bool pending_encap,
-                   bool pending_decap, bool l2_support)
+                   bool pending_decap)
 {
     int base_n = flow_count_mpls_labels(base, NULL);
     int flow_n = flow_count_mpls_labels(flow, NULL);
@@ -7940,15 +7940,12 @@ commit_mpls_action(const struct flow *flow, struct flow *base,
      * than base then some LSEs need to be pushed. */
     while (base_n < flow_n) {
 
-        if (pending_encap || l2_support) {
+        if (pending_encap) {
              struct ovs_action_add_mpls *mpls;
 
              mpls = nl_msg_put_unspec_zero(odp_actions,
                                            OVS_ACTION_ATTR_ADD_MPLS,
                                            sizeof *mpls);
-             if (!pending_encap) {
-                 mpls->tun_flags |= OVS_MPLS_L3_TUNNEL_FLAG_MASK;
-             }
              mpls->mpls_ethertype = flow->dl_type;
              mpls->mpls_lse = flow->mpls_lse[flow_n - base_n - 1];
         } else {
@@ -8594,8 +8591,7 @@ commit_encap_decap_action(const struct flow *flow,
                           struct ofpbuf *odp_actions,
                           struct flow_wildcards *wc,
                           bool pending_encap, bool pending_decap,
-                          struct ofpbuf *encap_data,
-                          bool mpls_l2_backer_support)
+                          struct ofpbuf *encap_data)
 {
     if (pending_encap) {
         switch (ntohl(flow->packet_type)) {
@@ -8618,7 +8614,7 @@ commit_encap_decap_action(const struct flow *flow,
             break;
         case PT_MPLS:
             commit_mpls_action(flow, base_flow, odp_actions, pending_encap,
-                               pending_decap, mpls_l2_backer_support);
+                               pending_decap);
             break;
         default:
             /* Only the above protocols are supported for encap.
@@ -8644,7 +8640,7 @@ commit_encap_decap_action(const struct flow *flow,
                 break;
             case PT_MPLS:
                 commit_mpls_action(flow, base_flow, odp_actions, pending_encap,
-                                   pending_decap, mpls_l2_backer_support);
+                                   pending_decap);
                 break;
             default:
                 /* Checks are done during translation. */
@@ -8675,8 +8671,7 @@ enum slow_path_reason
 commit_odp_actions(const struct flow *flow, struct flow *base,
                    struct ofpbuf *odp_actions, struct flow_wildcards *wc,
                    bool use_masked, bool pending_encap, bool pending_decap,
-                   struct ofpbuf *encap_data,
-                   bool mpls_l2_backer_support)
+                   struct ofpbuf *encap_data)
 {
     /* If you add a field that OpenFlow actions can change, and that is visible
      * to the datapath (including all data fields), then you should also add
@@ -8687,14 +8682,12 @@ commit_odp_actions(const struct flow *flow, struct flow *base,
     bool mpls_done = false;
 
     commit_encap_decap_action(flow, base, odp_actions, wc,
-                              pending_encap, pending_decap, encap_data,
-                              mpls_l2_backer_support);
+                              pending_encap, pending_decap, encap_data);
     commit_set_ether_action(flow, base, odp_actions, wc, use_masked);
     /* Make packet a non-MPLS packet before committing L3/4 actions,
      * which would otherwise do nothing. */
     if (eth_type_mpls(base->dl_type) && !eth_type_mpls(flow->dl_type)) {
-        commit_mpls_action(flow, base, odp_actions, false, false,
-                           mpls_l2_backer_support);
+        commit_mpls_action(flow, base, odp_actions, false, false);
         mpls_done = true;
     }
     commit_set_nsh_action(flow, base, odp_actions, wc, use_masked);
@@ -8702,8 +8695,7 @@ commit_odp_actions(const struct flow *flow, struct flow *base,
     commit_set_port_action(flow, base, odp_actions, wc, use_masked);
     slow2 = commit_set_icmp_action(flow, base, odp_actions, wc);
     if (!mpls_done) {
-        commit_mpls_action(flow, base, odp_actions, false, false,
-                           mpls_l2_backer_support);
+        commit_mpls_action(flow, base, odp_actions, false, false);
     }
     commit_vlan_action(flow, base, odp_actions, wc);
     commit_set_priority_action(flow, base, odp_actions, wc, use_masked);
