@@ -7840,7 +7840,7 @@ commit_set_ether_action(const struct flow *flow, struct flow *base_flow,
     struct offsetof_sizeof ovs_key_ethernet_offsetof_sizeof_arr[] =
         OVS_KEY_ETHERNET_OFFSETOF_SIZEOF_ARR;
 
-    if (flow->packet_type != htonl(PT_ETH)) {
+    if (base_flow->packet_type != htonl(PT_ETH)) {
         return;
     }
 
