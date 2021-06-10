@@ -2923,6 +2923,139 @@ clear_conntrack(struct flow *flow)
     memset(&flow->ct_label, 0, sizeof flow->ct_label);
 }
 
+/* Function to combine actions from following device/port with the current
+ * device actions in openflow pipeline. Mainly used for the translation of
+ * patch/tunnel port output actions. It pushes the openflow state into a stack
+ * first, clear out to execute the packet through the device and finally pop
+ * the openflow state back from the stack. This is equivalent to cloning
+ * a packet in translation for the duration of execution.
+ *
+ * On output to a patch port, the output action will be replaced with set of
+ * nested actions on the peer patch port.
+ * Similarly on output to a tunnel port, the post nested actions on
+ * tunnel are chained up with the tunnel-push action.
+ */
+static void
+patch_port_output(struct xlate_ctx *ctx, const struct xport *in_dev,
+              struct xport *out_dev)
+{
+    struct flow *flow = &ctx->xin->flow;
+    struct flow old_flow = ctx->xin->flow;
+    bool old_conntrack = ctx->conntracked;
+    bool old_was_mpls = ctx->was_mpls;
+    cls_version_t old_version = ctx->tables_version;
+    struct ofpbuf old_stack = ctx->stack;
+    union mf_subvalue new_stack[1024 / sizeof(union mf_subvalue)];
+    struct ofpbuf old_action_set = ctx->action_set;
+    uint64_t actset_stub[1024 / 8];
+
+
+    ofpbuf_use_stub(&ctx->stack, new_stack, sizeof new_stack);
+    ofpbuf_use_stub(&ctx->action_set, actset_stub, sizeof actset_stub);
+    flow->in_port.ofp_port = out_dev->ofp_port;
+    flow->metadata = htonll(0);
+    memset(&flow->tunnel, 0, sizeof flow->tunnel);
+    memset(flow->regs, 0, sizeof flow->regs);
+    flow->actset_output = OFPP_UNSET;
+    ctx->conntracked = false;
+    clear_conntrack(flow);
+
+
+    mirror_mask_t old_mirrors = ctx->mirrors;
+    bool independent_mirrors = out_dev->xbridge != ctx->xbridge;
+    if (independent_mirrors) {
+          ctx->mirrors = 0;
+    }
+    ctx->xbridge = out_dev->xbridge;
+
+    /* The bridge is now known so obtain its table version. */
+    ctx->tables_version
+        = ofproto_dpif_get_tables_version(ctx->xbridge->ofproto);
+
+    if (!process_special(ctx, out_dev) && may_receive(out_dev, ctx)) {
+        if (xport_stp_forward_state(out_dev) && xport_rstp_forward_state(out_dev)) {
+            xlate_table_action(ctx, flow->in_port.ofp_port, 0, true, true);
+            if (ctx->action_set.size) {
+                /* Translate action set only if not dropping the packet and
+                 * not recirculating. */
+                 if (!exit_recirculates(ctx)) {
+                     xlate_action_set(ctx);
+                 }
+             }
+             /* Check if need to recirculate. */
+             if (exit_recirculates(ctx)) {
+                 compose_recirculate_action(ctx);
+             }
+        } else {
+             /* Forwarding is disabled by STP and RSTP.  Let OFPP_NORMAL and
+              * the learning action look at the packet, then drop it. */
+              struct flow old_base_flow = ctx->base_flow;
+              size_t old_size = ctx->odp_actions->size;
+              mirror_mask_t old_mirrors2 = ctx->mirrors;
+
+              xlate_table_action(ctx, flow->in_port.ofp_port, 0, true, true);
+              ctx->mirrors = old_mirrors2;
+              ctx->base_flow = old_base_flow;
+              ctx->odp_actions->size = old_size;
+
+              /* Undo changes that may have been done for recirculation. */
+              if (exit_recirculates(ctx)) {
+                  ctx->action_set.size = ctx->recirc_action_offset;
+                  ctx->recirc_action_offset = -1;
+                  ctx->last_unroll_offset = -1;
+              }
+        }
+   }
+
+   if (independent_mirrors) {
+        ctx->mirrors = old_mirrors;
+   }
+   ctx->xin->flow = old_flow;
+   ctx->xbridge = in_dev->xbridge;
+   ofpbuf_uninit(&ctx->action_set);
+   ctx->action_set = old_action_set;
+   ofpbuf_uninit(&ctx->stack);
+   ctx->stack = old_stack;
+
+   /* Restore calling bridge's lookup version. */
+   ctx->tables_version = old_version;
+
+   /* The peer bridge popping MPLS should have no effect on the original
+    * bridge. */
+   ctx->was_mpls = old_was_mpls;
+
+   /* The peer bridge's conntrack execution should have no effect on the
+    * original bridge. */
+   ctx->conntracked = old_conntrack;
+
+   /* The fact that the peer bridge exits (for any reason) does not mean
+    * that the original bridge should exit.  Specifically, if the peer
+    * bridge recirculates (which typically modifies the packet), the
+    * original bridge must continue processing with the original, not the
+    * recirculated packet! */
+   ctx->exit = false;
+
+    /* Peer bridge errors do not propagate back. */
+    ctx->error = XLATE_OK;
+
+    if (ctx->xin->resubmit_stats) {
+        netdev_vport_inc_tx(in_dev->netdev, ctx->xin->resubmit_stats);
+        netdev_vport_inc_rx(out_dev->netdev, ctx->xin->resubmit_stats);
+        if (out_dev->bfd) {
+            bfd_account_rx(out_dev->bfd, ctx->xin->resubmit_stats);
+        }
+    }
+    if (ctx->xin->xcache) {
+        struct xc_entry *entry;
+
+        entry = xlate_cache_add_entry(ctx->xin->xcache, XC_NETDEV);
+        entry->u.dev.tx = netdev_ref(in_dev->netdev);
+        entry->u.dev.rx = netdev_ref(out_dev->netdev);
+        entry->u.dev.bfd = bfd_ref(out_dev->bfd);
+    }
+    return;
+}
+
 static void
 compose_output_action__(struct xlate_ctx *ctx, ofp_port_t ofp_port,
                         const struct xlate_bond_recirc *xr, bool check_stp)
@@ -3059,7 +3192,7 @@ compose_output_action__(struct xlate_ctx *ctx, ofp_port_t ofp_port,
             }
         }
 
-        if (independent_mirrors) {
+       if (independent_mirrors) {
             ctx->mirrors = old_mirrors;
         }
         ctx->xin->flow = old_flow;
