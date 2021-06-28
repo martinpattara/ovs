@@ -6418,6 +6418,9 @@ rewrite_flow_encap_mpls(struct xlate_ctx *ctx,
     flow->packet_type = htonl(PT_MPLS);
     n = flow_count_mpls_labels(flow, ctx->wc);
     flow_push_mpls(flow, n, htons(ether_type), ctx->wc, true);
+    flow->dl_src = eth_addr_zero;
+    flow->dl_dst = eth_addr_zero;
+
 }
 
 
