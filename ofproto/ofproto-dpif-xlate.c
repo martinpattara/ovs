@@ -6637,7 +6637,11 @@ xlate_generic_decap_action(struct xlate_ctx *ctx,
              ethertype = pt_ns_type_be(flow->packet_type);
 
              n = flow_count_mpls_labels(flow, ctx->wc);
+             if (!ethertype) {
+                 ethertype = htons(ETH_TYPE_TEB);
+             }	     
              flow_pop_mpls(flow, n, ethertype, ctx->wc);
+
              if (!ctx->xbridge->support.add_mpls) {
                 ctx->xout->slow |= SLOW_ACTION;
              }

@@ -7891,8 +7891,8 @@ commit_vlan_action(const struct flow* flow, struct flow *base,
 /* Wildcarding already done at action translation time. */
 static void
 commit_mpls_action(const struct flow *flow, struct flow *base,
-                   struct ofpbuf *odp_actions, bool pending_encap,
-                   bool pending_decap)
+                   struct ofpbuf *odp_actions, bool pending_encap)
+                   
 {
     int base_n = flow_count_mpls_labels(base, NULL);
     int flow_n = flow_count_mpls_labels(flow, NULL);
@@ -7929,11 +7929,7 @@ commit_mpls_action(const struct flow *flow, struct flow *base,
             if ((!eth_type_mpls(flow->dl_type)) && base_n > 1) {
                 dl_type = htons(ETH_TYPE_MPLS);
             } else {
-                if ((flow->packet_type == PT_ETH) && pending_decap) {
-                    dl_type =  htons(ETH_TYPE_TEB);
-                } else {
-                    dl_type = flow->dl_type;
-                }
+                dl_type = flow->dl_type;		    
             }
             nl_msg_put_be16(odp_actions, OVS_ACTION_ATTR_POP_MPLS, dl_type);
             ovs_assert(flow_pop_mpls(base, base_n, flow->dl_type, NULL));
@@ -8618,8 +8614,8 @@ commit_encap_decap_action(const struct flow *flow,
                    sizeof(*flow) - offsetof(struct flow, dl_dst));
             break;
         case PT_MPLS:
-            commit_mpls_action(flow, base_flow, odp_actions, pending_encap,
-                               pending_decap);
+            commit_mpls_action(flow, base_flow, odp_actions, pending_encap);
+                               
             break;
         default:
             /* Only the above protocols are supported for encap.
@@ -8644,8 +8640,7 @@ commit_encap_decap_action(const struct flow *flow,
                 odp_put_pop_nsh_action(odp_actions);
                 break;
             case PT_MPLS:
-                commit_mpls_action(flow, base_flow, odp_actions, pending_encap,
-                                   pending_decap);
+                commit_mpls_action(flow, base_flow, odp_actions, pending_encap);
                 break;
             default:
                 /* Checks are done during translation. */
@@ -8692,7 +8687,7 @@ commit_odp_actions(const struct flow *flow, struct flow *base,
     /* Make packet a non-MPLS packet before committing L3/4 actions,
      * which would otherwise do nothing. */
     if (eth_type_mpls(base->dl_type) && !eth_type_mpls(flow->dl_type)) {
-        commit_mpls_action(flow, base, odp_actions, false, false);
+        commit_mpls_action(flow, base, odp_actions, false);
         mpls_done = true;
     }
     commit_set_nsh_action(flow, base, odp_actions, wc, use_masked);
@@ -8700,7 +8695,7 @@ commit_odp_actions(const struct flow *flow, struct flow *base,
     commit_set_port_action(flow, base, odp_actions, wc, use_masked);
     slow2 = commit_set_icmp_action(flow, base, odp_actions, wc);
     if (!mpls_done) {
-        commit_mpls_action(flow, base, odp_actions, false, false);
+        commit_mpls_action(flow, base, odp_actions, false);
     }
     commit_vlan_action(flow, base, odp_actions, wc);
     commit_set_priority_action(flow, base, odp_actions, wc, use_masked);
