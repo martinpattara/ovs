@@ -6642,7 +6642,12 @@ xlate_generic_decap_action(struct xlate_ctx *ctx,
                 ctx->xout->slow |= SLOW_ACTION;
              }
              ctx->pending_decap = true;
-             return true;
+             if (n == 1) {
+                  /* Trigger recirculation. */		     
+                  return true;
+             } else {
+                  return false;
+             }
         }
         default:
             /* Error handling: drop packet. */
